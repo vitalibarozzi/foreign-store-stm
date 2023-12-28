@@ -1,0 +1,14 @@
+/nix/store/85p05627rg2skb468r2gm1rgsamyx063-ghc-9.4.7/lib/ghc-9.4.7/rts/include/ghcversion.h:
+  hash: ee548d48ca5c94d7c7fab127ec07be47b01afa24d6495358aa9ff6cfc8541c81
+/nix/store/linb70pgp53f0kygxm5wk163dx22d681-glibc-2.37-45-dev/include/stdc-predef.h:
+  hash: d6bcc58441a423bbb3a52171fcd3b84d8b36e332a55221a1c3e6e899bc43ccb3
+/run/media/vb/data/docs/foo/.stack-work/dist/x86_64-linux-nix/Cabal-3.8.1.0/build/app-exe/autogen/Paths_app.hs:
+  hash: c74e2890842777de546213d1789ca0e9117ee293cc2d281c475b24a8292df163
+/run/media/vb/data/docs/foo/.stack-work/dist/x86_64-linux-nix/Cabal-3.8.1.0/build/app-exe/autogen/cabal_macros.h:
+  hash: b7993811d91e452c1d85d39c0e5d6b417771fb335b9ed45f330b2b394bf652f0
+/run/media/vb/data/docs/foo/app.cabal:
+  hash: bfd972721726097d9807cf2e24d6d364e58174941258aa4b421be93031b11825
+/run/media/vb/data/docs/foo/app/Main.hs:
+  hash: d85c3d6652add33599dee603bad3d158ad0a2bc336f5a9eea68053157a236c75
+/run/media/vb/data/docs/foo/package.yaml:
+  hash: 78b9679cb4c0a939dc69c2a8483fffeb0f080f1f5660b627ff8d6c2f21fda3d4

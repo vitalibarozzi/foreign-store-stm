@@ -1,0 +1,18 @@
+/nix/store/85p05627rg2skb468r2gm1rgsamyx063-ghc-9.4.7/lib/ghc-9.4.7/rts/include/ghcversion.h:
+  hash: ee548d48ca5c94d7c7fab127ec07be47b01afa24d6495358aa9ff6cfc8541c81
+/nix/store/linb70pgp53f0kygxm5wk163dx22d681-glibc-2.37-45-dev/include/stdc-predef.h:
+  hash: d6bcc58441a423bbb3a52171fcd3b84d8b36e332a55221a1c3e6e899bc43ccb3
+/run/media/vb/data/docs/foo/.stack-work/dist/x86_64-linux-nix/Cabal-3.8.1.0/build/autogen/Paths_app.hs:
+  hash: d1bf101215093618795a10204c00862aa1897449876407e23cf21bf045f6608a
+/run/media/vb/data/docs/foo/.stack-work/dist/x86_64-linux-nix/Cabal-3.8.1.0/build/autogen/cabal_macros.h:
+  hash: 487d67034110d7ba87873a6d1e99d3757498ac98b2742a44f81dfb4563e05950
+/run/media/vb/data/docs/foo/app.cabal:
+  hash: bfd972721726097d9807cf2e24d6d364e58174941258aa4b421be93031b11825
+/run/media/vb/data/docs/foo/package.yaml:
+  hash: 78b9679cb4c0a939dc69c2a8483fffeb0f080f1f5660b627ff8d6c2f21fda3d4
+/run/media/vb/data/docs/foo/src/Game.hs:
+  hash: c2dfdbafdf766d481e234c7a4c479e1c0a7f46a8421065b7e1030c140ee8dcf2
+/run/media/vb/data/docs/foo/src/Lib.hs:
+  hash: b524c5f8fdec39963a18f0b73ab1c98663e447b4e1dd3a15802db6e9bbc06bd1
+/run/media/vb/data/docs/foo/src/Live.hs:
+  hash: ac4bc20e0bfaca9b6932ed9bd39da3a7ef8fbcbc71b3f678c08ae520afeea727
