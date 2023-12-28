@@ -30,6 +30,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , foreign-store
     , ghc-hotswap
     , stm
   default-language: Haskell2010
@@ -54,6 +55,7 @@ executable app-exe
       app
     , base >=4.7 && <5
     , containers
+    , foreign-store
     , ghc-hotswap
     , stm
   default-language: Haskell2010
@@ -79,6 +81,7 @@ test-suite app-test
       app
     , base >=4.7 && <5
     , containers
+    , foreign-store
     , ghc-hotswap
     , stm
   default-language: Haskell2010

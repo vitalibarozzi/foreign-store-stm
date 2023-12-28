@@ -3,12 +3,12 @@
 /nix/store/linb70pgp53f0kygxm5wk163dx22d681-glibc-2.37-45-dev/include/stdc-predef.h:
   hash: d6bcc58441a423bbb3a52171fcd3b84d8b36e332a55221a1c3e6e899bc43ccb3
 /run/media/vb/data/docs/foo/.stack-work/dist/x86_64-linux-nix/Cabal-3.8.1.0/build/app-exe/autogen/Paths_app.hs:
-  hash: c74e2890842777de546213d1789ca0e9117ee293cc2d281c475b24a8292df163
+  hash: 8599b46e30b3c33b909a1ffed460491fc3693da0f0fb8ea87b1299345ef23206
 /run/media/vb/data/docs/foo/.stack-work/dist/x86_64-linux-nix/Cabal-3.8.1.0/build/app-exe/autogen/cabal_macros.h:
-  hash: b7993811d91e452c1d85d39c0e5d6b417771fb335b9ed45f330b2b394bf652f0
+  hash: c3f98ce4444a93bed0432d013faa63aa4fd7d05e5b2a0aceef33ceb922e62887
 /run/media/vb/data/docs/foo/app.cabal:
-  hash: bfd972721726097d9807cf2e24d6d364e58174941258aa4b421be93031b11825
+  hash: 4a47cb550d1e97672dea72a6e4a7ba7e5620a67c29600e1346511746b14d5817
 /run/media/vb/data/docs/foo/app/Main.hs:
   hash: d85c3d6652add33599dee603bad3d158ad0a2bc336f5a9eea68053157a236c75
 /run/media/vb/data/docs/foo/package.yaml:
-  hash: 78b9679cb4c0a939dc69c2a8483fffeb0f080f1f5660b627ff8d6c2f21fda3d4
+  hash: fcef66e8b7ea096f75452f954e4d07834954fcd1017bb49f4ee17801e57e4378

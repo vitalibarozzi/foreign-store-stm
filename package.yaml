@@ -6,6 +6,7 @@ dependencies:
 - ghc-hotswap
 - containers
 - stm
+- foreign-store
 
 default-extensions:
 - OverloadedStrings

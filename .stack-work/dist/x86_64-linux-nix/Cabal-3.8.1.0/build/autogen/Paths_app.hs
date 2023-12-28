@@ -44,7 +44,7 @@ getBinDir, getLibDir, getDynLibDir, getDataDir, getLibexecDir, getSysconfDir :: 
 
 bindir, libdir, dynlibdir, datadir, libexecdir, sysconfdir :: FilePath
 bindir     = "/run/media/vb/data/docs/foo/.stack-work/install/x86_64-linux-nix/085436eee16d2ec62ef7b34e9a65fd4815c4f061c82625db1472f1c3eebd2c15/9.4.7/bin"
-libdir     = "/run/media/vb/data/docs/foo/.stack-work/install/x86_64-linux-nix/085436eee16d2ec62ef7b34e9a65fd4815c4f061c82625db1472f1c3eebd2c15/9.4.7/lib/x86_64-linux-ghc-9.4.7/app-0.1.0.0-EOpLrs5hrG1CzVlQMaKAzd"
+libdir     = "/run/media/vb/data/docs/foo/.stack-work/install/x86_64-linux-nix/085436eee16d2ec62ef7b34e9a65fd4815c4f061c82625db1472f1c3eebd2c15/9.4.7/lib/x86_64-linux-ghc-9.4.7/app-0.1.0.0-GlSH8R69xu1J7GePtHNWTi"
 dynlibdir  = "/run/media/vb/data/docs/foo/.stack-work/install/x86_64-linux-nix/085436eee16d2ec62ef7b34e9a65fd4815c4f061c82625db1472f1c3eebd2c15/9.4.7/lib/x86_64-linux-ghc-9.4.7"
 datadir    = "/run/media/vb/data/docs/foo/.stack-work/install/x86_64-linux-nix/085436eee16d2ec62ef7b34e9a65fd4815c4f061c82625db1472f1c3eebd2c15/9.4.7/share/x86_64-linux-ghc-9.4.7/app-0.1.0.0"
 libexecdir = "/run/media/vb/data/docs/foo/.stack-work/install/x86_64-linux-nix/085436eee16d2ec62ef7b34e9a65fd4815c4f061c82625db1472f1c3eebd2c15/9.4.7/libexec/x86_64-linux-ghc-9.4.7/app-0.1.0.0"

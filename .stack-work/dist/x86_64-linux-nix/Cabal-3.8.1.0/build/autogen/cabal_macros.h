@@ -30,6 +30,16 @@
   (major1) == 0 && (major2) <  6 || \
   (major1) == 0 && (major2) == 6 && (minor) <= 7)
 #endif /* MIN_VERSION_containers */
+/* package foreign-store-0.2 */
+#ifndef VERSION_foreign_store
+#define VERSION_foreign_store "0.2"
+#endif /* VERSION_foreign_store */
+#ifndef MIN_VERSION_foreign_store
+#define MIN_VERSION_foreign_store(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  2 || \
+  (major1) == 0 && (major2) == 2 && (minor) <= 0)
+#endif /* MIN_VERSION_foreign_store */
 /* package ghc-hotswap-0.1.0.1 */
 #ifndef VERSION_ghc_hotswap
 #define VERSION_ghc_hotswap "0.1.0.1"
@@ -133,10 +143,10 @@
 #endif /* MIN_TOOL_VERSION_strip */
 
 #ifndef CURRENT_PACKAGE_KEY
-#define CURRENT_PACKAGE_KEY "app-0.1.0.0-EOpLrs5hrG1CzVlQMaKAzd"
+#define CURRENT_PACKAGE_KEY "app-0.1.0.0-GlSH8R69xu1J7GePtHNWTi"
 #endif /* CURRENT_packageKey */
 #ifndef CURRENT_COMPONENT_ID
-#define CURRENT_COMPONENT_ID "app-0.1.0.0-EOpLrs5hrG1CzVlQMaKAzd"
+#define CURRENT_COMPONENT_ID "app-0.1.0.0-GlSH8R69xu1J7GePtHNWTi"
 #endif /* CURRENT_COMPONENT_ID */
 #ifndef CURRENT_PACKAGE_VERSION
 #define CURRENT_PACKAGE_VERSION "0.1.0.0"
