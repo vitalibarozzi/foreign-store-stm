@@ -1,10 +1,12 @@
-name:                live-store
+name:                tstore
 version:             0.1.0.0
 
 dependencies:
 - base >= 4.7 && < 5
-- containers
 - foreign-store
+- concurrent-extra
+- stm
+- deepseq
 
 default-extensions:
 - OverloadedStrings

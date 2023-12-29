@@ -1,124 +1,124 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
+
+-- | Wrapper around `Foreign.Store` to make it thread-safe (hopefully).
 module GHC.GHCi.Live 
---    ( live
---    , swap
---    , rebindReload
---    , foo
---    )
+    ( -- * Transactional Store
+      TStore
+    -- * Creation
+    , newTStore
+    -- * Reading
+    , readTStore
+    -- * Writting
+    , writeTStore
+    -- * Utils
+    , lookupTStore
+    , lookupTStore_
+    , indexTStore
+    -- * Reexports
+    , module STM
+    )
 where
 
 
+import Control.DeepSeq
+import qualified Control.Concurrent.STM as STM
 import Data.Word (Word32)
-import qualified Data.Map as Map
-import qualified Foreign.Store as Store
-import System.IO.Unsafe
-import Data.Unique
-import Control.Monad.IO.Class
-import Control.Concurrent
-import Control.Monad
-
-        
-    
-foo :: IO Int
-foo = do
-    live "foo" do
-        print "++++"
-        pure (0 :: Int)
+import qualified Foreign.Store as Foreign (Store(Store),lookupStore,readStore,newStore)
+import Control.Exception (bracket,catch,SomeException(..))
+import GHC.Conc (STM,unsafeIOToSTM,retry)
+import qualified Control.Concurrent.ReadWriteLock as Lock (RWLock, acquireRead, acquireWrite, releaseRead, releaseWrite, new)
+import Data.IORef (IORef,newIORef,writeIORef,readIORef)
+import Data.Typeable
 
 
--- TODO how do i make the ":r" also foo besides reloading the modules?
--- :def r (\args -> pure (":reaload\nswap (\"foo\",undefined) foo"))
+-- | Read-only transactional store based on `Foreign.Store.Store`.
+-- It is read-only so as to keep the mutable state inside the Store, 
+-- under a lock.
+newtype TStore a 
+    = TStore 
+        (Foreign.Store 
+            ( Lock.RWLock
+            , TypeRep
+            , IORef a
+            ))
 
 
--- | To be used inside GHCi with ":cmd", so the macro ":r" will reload as 
--- expected, but also swap the needed functions with their new version.
-rebindReload :: IO String
-rebindReload = do
-    -- TODo remove this hardcoded foo from here
-    pure ":def! r (const (pure \":reload\\nswap \\\"foo\\\" foo\"))"
-    
-
-live :: String -> IO a -> IO a
-{-# NOINLINE live #-}
-live name io = do
-    io
-{-
-    unsafePerformIO do
-        unique0 <- newUnique
-        pure \name def -> do
-            Store.lookupStore _storeNumber >>= \case
-                Just store -> ddoo
-                    mpio <- Store.readStore store
-                    case Map.lookup name mpio of
-                        Just (lastOne, io) -> do
-                            case lastOne of
-                                Nothing -> do
-                                    Store.writeStore store (Map.insert name (Just unique0,def) mpio)
-                                    def
-                                Just unique1 -> 
-                                   if unique1 == unique0
-                                       then def
-                                       else undefined
-                            if lastOne == Just unique
-                                then do
-                                    --putStrLn "eq"
-                                    io
-                                else do
-                                    --putStrLn "not eq"
-                                    Store.writeStore store (Map.insert name (Just unique,def) mpio)
-                                    def
-                        Nothing -> do
-                            Store.writeStore store (Map.insert name (Just unique0,def) mpio)
-                            def
-                Nothing -> do
-                    newStore (Map.singleton (name,def)) 
-                    live name def
-                                    -}
+instance Eq (TStore a) where
+    {-# INLINE (==) #-}
+    (==) !(TStore (Foreign.Store n0)) !(TStore (Foreign.Store n1)) = 
+        n0 == n1
 
 
-{-# NOINLINE swap #-}
-swap :: String -> IO a -> IO ()
-swap = do
-    unsafePerformIO do
-        unique0 <- newUnique
-        pure \name new -> do
-            Store.lookupStore _storeNumber >>= \case
-                Just store -> do
-                    mpio <- Store.readStore store
-                    Store.writeStore store (Map.insert name (Just unique0, new) mpio)
-                    pure ()
-                Nothing -> do
-                    _store <- newStore name (unique0, new)
-                    pure ()
+instance Show (TStore a) where
+    {-# INLINE show #-}
+    show !(TStore store) = 
+        "TStore ("<>show store<>")"
 
 
-newStore :: String -> (Unique, IO a) -> IO (Store.Store (Map.Map String (Maybe Unique, IO a)))
-newStore name (unique,io) = do
-    store <- Store.newStore (Map.insert name (Just unique, io) mempty)
-    when (show store /= ("Store "<>show _storeNumber)) (error "fuen")
-    pure store
-    
+newTStore :: (NFData a, Typeable a) => a -> STM (TStore a)
+{-# INLINE newTStore #-}
+newTStore !(_deepseq2 -> a) = do
+    maybe retry pure =<< unsafeIOToSTM go
+  where
+    go = do
+        catch 
+            (fmap Just newTStoreIO) 
+            (\(SomeException _) -> pure Nothing)
+    newTStoreIO = do
+        !lock  <- Lock.new
+        !ioref <- newIORef a
+        !store <- Foreign.newStore (lock, typeOf a, ioref)
+        pure (TStore store)
 
 
-{-# INLINE _storeNumber #-}
-_storeNumber :: Word32
-_storeNumber = 0 -- TODO this is going to fail at some point
+readTStore :: TStore a -> STM a
+{-# INLINE readTStore #-}
+readTStore !(TStore store) = do
+    unsafeIOToSTM do
+        !(lock, _typeR, spa) <- Foreign.readStore store
+        bracket 
+            (Lock.acquireRead lock >> pure lock) 
+            (Lock.releaseRead)
+            (const (readIORef spa))
 
 
--- | This test only works on ghci.
-main :: IO ()
-main = do
-    putStrLn "starting main..."
-    liftIO $ forkIO $ forever $ do
-        threadDelay 500000 
-        putStrLn "running loop..."
-        foo 
-        threadDelay 500000 
-        swapFoo 
-        threadDelay 500000 
-        foo
-    pure ()
+writeTStore :: (NFData a) => TStore a -> a -> STM ()
+{-# INLINE writeTStore #-}
+writeTStore !(TStore store) !(_deepseq2 -> a) = do 
+    unsafeIOToSTM do
+        !(lock, _typeR, spa) <- Foreign.readStore store
+        bracket 
+            (Lock.acquireWrite lock >> pure lock) 
+            (Lock.releaseWrite)
+            (const (writeIORef spa a))
 
 
-swapFoo :: IO ()
-swapFoo = do
-    swap "foo" do pure (666 :: Int)
+-- | Will retry until if finds a store.
+lookupTStore :: Word32 -> STM (TStore a)
+{-# INLINE lookupTStore #-}
+lookupTStore !n = do
+    maybe retry pure =<< lookupTStore_ n
+
+
+-- | Returns `Nothing` if it can't find a store for the given index.
+lookupTStore_ :: Word32 -> STM (Maybe (TStore a))
+{-# INLINE lookupTStore_ #-}
+lookupTStore_ !n = do
+    unsafeIOToSTM (Foreign.lookupStore n) >>= \case
+        Just store -> pure (Just (TStore store))
+        Nothing    -> pure Nothing
+
+
+-- | Get the corresponding index for the store.
+indexTStore :: TStore a -> Word32
+{-# INLINE indexTStore #-}
+indexTStore !(TStore (Foreign.Store n)) = n 
+
+
+-------------------------------------------------------------------------------
+-- INTERNALS ------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
+_deepseq2 :: NFData a => a -> a
+_deepseq2 !a = deepseq a a
