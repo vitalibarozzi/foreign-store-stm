@@ -3,12 +3,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DerivingStrategies #-}
 module Live 
-    ( Live(..)
-    , live
-    , selfSwap
-    , LiveMonad(..)
-    , liveMonadIO
-    )
+ --   ( Live(..)
+ --   , live
+ --   , selfSwap
+ --   , LiveMonad(..)
+ --   , liveMonadIO
+ --   )
 where
 
 
@@ -22,6 +22,52 @@ import Unsafe.Coerce
 import Foreign.Store
 
 
+test :: IO ()
+test = do
+    maybeStore <- lookupStore 1
+    s <- case maybeStore of
+        Just store -> readStore store
+        Nothing    -> putStrLn "Creating new store..." >> newStore "" >> newStore "+" >>= readStore
+    putStrLn s
+
+
+
+live :: String -> IO a -> IO a
+{-# NOINLINE live #-}
+live name def = do
+    maybeStore <- lookupStore 0
+    case maybeStore of
+        Just store -> do
+            mpio <- readStore store
+            case Map.lookup name mpio of
+                Just io -> io
+                Nothing -> do
+                    writeStore store (Map.insert name def mpio)
+                    live name def
+        Nothing -> newStore (Map.singleton (name,def)) >> newStore (Map.singleton (name,def)) >> live name def
+
+
+
+swap :: String -> IO a -> IO ()
+swap name new = do
+    maybeStore <- lookupStore 0
+    case maybeStore of
+        Just store -> do
+            mpio <- readStore store
+            writeStore store (Map.insert name new mpio)
+            pure ()
+        Nothing -> do
+
+            store <- newStore new 
+            pure ()
+
+    
+
+_imNew = undefined
+
+
+
+{-
 -- | For working with functions that can be hotswapped. Very unsafe. (Supports GHCi)
 class Live m where
     -- | Hotswaps the definition under this name.
@@ -153,3 +199,4 @@ _runOpaque :: Opaque -> (forall a. Config -> IO a)
 _runOpaque (MkOpaque a) = a 
 _newOpaque :: (forall a. Config -> IO a) -> Opaque 
 _newOpaque a = MkOpaque (unsafeCoerce a)
+-}
