@@ -2,6 +2,5 @@ resolver:
   url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/19.yaml
 packages:
 - .
-- ../libs/ghc-hotswap
 nix:
   enable: true  # false by default, except on NixOS

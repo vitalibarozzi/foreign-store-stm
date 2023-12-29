@@ -1,4 +1,3 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
 import GHC.GHCi.Live (live,swap)
 import Control.Monad.IO.Class
 import Control.Concurrent
@@ -8,20 +7,18 @@ import Control.Monad
 
 
 -- | This test only works on ghci.
-ghciTest :: IO ()
-ghciTest = do
+main :: IO ()
+main = do
     liftIO $ forkIO $ forever $ do
         threadDelay 1000000 
         foo 
-        --swapFoo 
+        swapFoo 
         foo
-        --swapQux
+        swapQux
         foo
     pure ()
         
     
-
-
 foo :: IO Int
 foo = do
     live "foo" do
