@@ -4,17 +4,15 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           app
+name:           live-store
 version:        0.1.0.0
 build-type:     Simple
 
 library
   exposed-modules:
-      Game
-      Lib
-      Live
+      GHC.GHCi.Live
   other-modules:
-      Paths_app
+      Paths_live_store
   hs-source-dirs:
       src
   default-extensions:
@@ -31,40 +29,13 @@ library
       base >=4.7 && <5
     , containers
     , foreign-store
-    , ghc-hotswap
-    , stm
   default-language: Haskell2010
 
-executable app-exe
-  main-is: Main.hs
-  other-modules:
-      Paths_app
-  hs-source-dirs:
-      app
-  default-extensions:
-      OverloadedStrings
-      LambdaCase
-      RecordWildCards
-      ScopedTypeVariables
-      BlockArguments
-      RankNTypes
-      MultiParamTypeClasses
-      TypeApplications
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      app
-    , base >=4.7 && <5
-    , containers
-    , foreign-store
-    , ghc-hotswap
-    , stm
-  default-language: Haskell2010
-
-test-suite app-test
+test-suite live-store-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_app
+      Paths_live_store
   hs-source-dirs:
       test
   default-extensions:
@@ -78,10 +49,8 @@ test-suite app-test
       TypeApplications
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      app
-    , base >=4.7 && <5
+      base >=4.7 && <5
     , containers
     , foreign-store
-    , ghc-hotswap
-    , stm
+    , live-store
   default-language: Haskell2010

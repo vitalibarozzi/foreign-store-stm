@@ -40,6 +40,16 @@
   (major1) == 0 && (major2) <  2 || \
   (major1) == 0 && (major2) == 2 && (minor) <= 0)
 #endif /* MIN_VERSION_foreign_store */
+/* package live-store-0.1.0.0 */
+#ifndef VERSION_live_store
+#define VERSION_live_store "0.1.0.0"
+#endif /* VERSION_live_store */
+#ifndef MIN_VERSION_live_store
+#define MIN_VERSION_live_store(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  1 || \
+  (major1) == 0 && (major2) == 1 && (minor) <= 0)
+#endif /* MIN_VERSION_live_store */
 
 /* tool gcc-12.2.0 */
 #ifndef TOOL_VERSION_gcc
@@ -122,11 +132,8 @@
   (major1) == 2 && (major2) == 40 && (minor) <= 0)
 #endif /* MIN_TOOL_VERSION_strip */
 
-#ifndef CURRENT_PACKAGE_KEY
-#define CURRENT_PACKAGE_KEY "live-store-0.1.0.0-3E5u7ZegktzVn5qq4R2tU"
-#endif /* CURRENT_packageKey */
 #ifndef CURRENT_COMPONENT_ID
-#define CURRENT_COMPONENT_ID "live-store-0.1.0.0-3E5u7ZegktzVn5qq4R2tU"
+#define CURRENT_COMPONENT_ID "live-store-0.1.0.0-E65K4WGrZgbB7TNKlf6siZ-live-store-test"
 #endif /* CURRENT_COMPONENT_ID */
 #ifndef CURRENT_PACKAGE_VERSION
 #define CURRENT_PACKAGE_VERSION "0.1.0.0"

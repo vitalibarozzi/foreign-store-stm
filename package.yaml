@@ -1,11 +1,11 @@
-name:                app
+name:                live-store
 version:             0.1.0.0
 
 dependencies:
 - base >= 4.7 && < 5
-- ghc-hotswap
+# - ghc-hotswap
 - containers
-- stm
+#- stm
 - foreign-store
 
 default-extensions:
@@ -32,19 +32,8 @@ ghc-options:
 library:
   source-dirs: src
 
-executables:
-  app-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - app
-
 tests:
-  app-test:
+  live-store-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -52,4 +41,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - app
+    - live-store
