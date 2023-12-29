@@ -1,0 +1,3 @@
+putStrLn "------------------------------------"
+:def! r (const (putStrLn "Reloading..." >> pure ":reload\nswap \"foo\" foo"))
+putStrLn "------------------------------------"
