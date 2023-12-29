@@ -1,4 +1,4 @@
-name:                tstore
+name:                foreign-store-stm
 version:             0.1.0.0
 
 dependencies:
@@ -41,4 +41,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - tstore
+    - foreign-store-stm

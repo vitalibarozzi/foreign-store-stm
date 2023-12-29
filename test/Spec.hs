@@ -1,4 +1,4 @@
-import GHC.GHCi.Live
+import Control.Concurrent.STM.TStore
 import Control.Monad.IO.Class
 import Control.Concurrent
 import Control.Concurrent.STM

@@ -4,15 +4,15 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           tstore
+name:           foreign-store-stm
 version:        0.1.0.0
 build-type:     Simple
 
 library
   exposed-modules:
-      GHC.GHCi.Live
+      Control.Concurrent.STM.TStore
   other-modules:
-      Paths_tstore
+      Paths_foreign_store_stm
   hs-source-dirs:
       src
   default-extensions:
@@ -37,7 +37,7 @@ test-suite tstore-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_tstore
+      Paths_foreign_store_stm
   hs-source-dirs:
       test
   default-extensions:
@@ -55,6 +55,6 @@ test-suite tstore-test
     , concurrent-extra
     , deepseq
     , foreign-store
+    , foreign-store-stm
     , stm
-    , tstore
   default-language: Haskell2010

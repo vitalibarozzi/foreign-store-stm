@@ -3,7 +3,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Wrapper around `Foreign.Store` to make it thread-safe (hopefully).
-module GHC.GHCi.Live 
+module Control.Concurrent.STM.TStore
     ( -- * Transactional Store
       TStore
     -- * Creation
@@ -25,6 +25,7 @@ where
 import Control.DeepSeq
 import Control.Monad
 import qualified Control.Concurrent.STM as STM
+import Control.Concurrent
 import Data.Word (Word32)
 import qualified Foreign.Store as Foreign (Store(Store),lookupStore,readStore,newStore)
 import Control.Exception (bracket,catch,SomeException(..))
@@ -42,7 +43,6 @@ newtype TStore a
         (Foreign.Store 
             ( Lock.RWLock
             , TypeRep
-            --, (Typeable a => IORef a)
             , IORef a
             ))
 
@@ -64,8 +64,7 @@ newTStore :: (NFData a, Typeable a) => a -> STM (TStore a)
 newTStore !(_deepseq2 -> a) = do
     maybe retry pure =<< unsafeIOToSTM go
   where
-    go = do
-        catch 
+    go = catch 
             (fmap Just newTStoreIO) 
             (\(SomeException _) -> pure Nothing)
     newTStoreIO = do
@@ -82,7 +81,7 @@ readTStore !(TStore store) = do
         !(lock, typeR, spa) <- Foreign.readStore store
         bracket 
             (Lock.acquireRead lock >> pure lock) 
-            (Lock.releaseRead)
+            (\l -> Lock.releaseRead l >> threadDelay 1)
             (\_ -> do 
                 a <- (\x -> seq x x) <$> readIORef spa
                 pure (if typeOf a == typeR then Just a else Nothing)
@@ -97,13 +96,13 @@ writeTStore !(TStore store) !(_deepseq2 -> a) = do
         !(lock, _typeR, spa) <- Foreign.readStore store
         bracket 
             (Lock.acquireWrite lock >> pure lock) 
-            (Lock.releaseWrite)
+            (\l -> Lock.releaseWrite l >> threadDelay 1)
             (const (writeIORef spa a))
 
 
 -- | Will retry until if finds a store and a value of the expected type
 -- inside it.
-lookupTStore :: Word32 -> STM (TStore a)
+lookupTStore :: (Typeable a) => Word32 -> STM (TStore a)
 {-# INLINE lookupTStore #-}
 lookupTStore !n = do
     maybe retry pure =<< lookupTStore_ n
@@ -111,19 +110,32 @@ lookupTStore !n = do
 
 -- | Returns `Nothing` if it can't find a store for the given index
 -- or if there are a type mismatch.
-lookupTStore_ :: Word32 -> STM (Maybe (TStore a))
+lookupTStore_ :: (Typeable a) => Word32 -> STM (Maybe (TStore a))
 {-# INLINE lookupTStore_ #-}
 lookupTStore_ !n = do
-    unsafeIOToSTM (Foreign.lookupStore n) >>= \case
+    (unsafeIOToSTM (Foreign.lookupStore n)) >>= \case
         Nothing    -> pure Nothing
-        Just store -> pure (Just (TStore store))
+        Just store -> do
+            !(lock, typeR, ref) <- unsafeIOToSTM do Foreign.readStore store
+            () <- unsafeIOToSTM (Lock.acquireWrite lock)
+            xx <- unsafeIOToSTM (readIORef ref)
+            () <- unsafeIOToSTM (Lock.releaseWrite lock)
+            () <- unsafeIOToSTM (threadDelay 1)
+            if typeR /= typeOf xx
+                then pure Nothing
+                else pure (Just (TStore store))
+
+
+-------------------------------------------------------------------------------
+-- HELPERS --------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 
 -- | Get the corresponding index for the store.
 indexTStore :: TStore a -> Word32
 {-# INLINE indexTStore #-}
 indexTStore !(TStore (Foreign.Store n)) = 
-    seq n n 
+    n
 
 
 -------------------------------------------------------------------------------
