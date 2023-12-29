@@ -33,7 +33,7 @@ library
     , stm
   default-language: Haskell2010
 
-test-suite live-store-test
+test-suite tstore-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
@@ -55,6 +55,6 @@ test-suite live-store-test
     , concurrent-extra
     , deepseq
     , foreign-store
-    , live-store
     , stm
+    , tstore
   default-language: Haskell2010

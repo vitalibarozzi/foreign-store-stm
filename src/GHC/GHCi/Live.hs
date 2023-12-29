@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Wrapper around `Foreign.Store` to make it thread-safe (hopefully).
@@ -22,6 +23,7 @@ where
 
 
 import Control.DeepSeq
+import Control.Monad
 import qualified Control.Concurrent.STM as STM
 import Data.Word (Word32)
 import qualified Foreign.Store as Foreign (Store(Store),lookupStore,readStore,newStore)
@@ -40,6 +42,7 @@ newtype TStore a
         (Foreign.Store 
             ( Lock.RWLock
             , TypeRep
+            --, (Typeable a => IORef a)
             , IORef a
             ))
 
@@ -72,15 +75,19 @@ newTStore !(_deepseq2 -> a) = do
         pure (TStore store)
 
 
-readTStore :: TStore a -> STM a
+readTStore :: (Typeable a) => TStore a -> STM a
 {-# INLINE readTStore #-}
 readTStore !(TStore store) = do
-    unsafeIOToSTM do
-        !(lock, _typeR, spa) <- Foreign.readStore store
+    ma <- unsafeIOToSTM do
+        !(lock, typeR, spa) <- Foreign.readStore store
         bracket 
             (Lock.acquireRead lock >> pure lock) 
             (Lock.releaseRead)
-            (const (readIORef spa))
+            (\_ -> do 
+                a <- (\x -> seq x x) <$> readIORef spa
+                pure (if typeOf a == typeR then Just a else Nothing)
+            )
+    maybe retry pure ma
 
 
 writeTStore :: (NFData a) => TStore a -> a -> STM ()
@@ -94,26 +101,29 @@ writeTStore !(TStore store) !(_deepseq2 -> a) = do
             (const (writeIORef spa a))
 
 
--- | Will retry until if finds a store.
+-- | Will retry until if finds a store and a value of the expected type
+-- inside it.
 lookupTStore :: Word32 -> STM (TStore a)
 {-# INLINE lookupTStore #-}
 lookupTStore !n = do
     maybe retry pure =<< lookupTStore_ n
 
 
--- | Returns `Nothing` if it can't find a store for the given index.
+-- | Returns `Nothing` if it can't find a store for the given index
+-- or if there are a type mismatch.
 lookupTStore_ :: Word32 -> STM (Maybe (TStore a))
 {-# INLINE lookupTStore_ #-}
 lookupTStore_ !n = do
     unsafeIOToSTM (Foreign.lookupStore n) >>= \case
-        Just store -> pure (Just (TStore store))
         Nothing    -> pure Nothing
+        Just store -> pure (Just (TStore store))
 
 
 -- | Get the corresponding index for the store.
 indexTStore :: TStore a -> Word32
 {-# INLINE indexTStore #-}
-indexTStore !(TStore (Foreign.Store n)) = n 
+indexTStore !(TStore (Foreign.Store n)) = 
+    seq n n 
 
 
 -------------------------------------------------------------------------------
@@ -121,4 +131,5 @@ indexTStore !(TStore (Foreign.Store n)) = n
 -------------------------------------------------------------------------------
 
 _deepseq2 :: NFData a => a -> a
+{-# INLINE _deepseq2 #-}
 _deepseq2 !a = deepseq a a

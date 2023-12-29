@@ -33,7 +33,7 @@ library:
   source-dirs: src
 
 tests:
-  live-store-test:
+  tstore-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -41,4 +41,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - live-store
+    - tstore
