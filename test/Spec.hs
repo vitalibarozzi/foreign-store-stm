@@ -1,33 +1,30 @@
 import Control.Concurrent.STM.TStore
-import Control.Monad.IO.Class
-import Control.Concurrent
-import Control.Concurrent.STM
+import Control.Concurrent.STM (atomically)
 import Control.Monad
+import Control.Concurrent
 import System.Timeout
 
+main :: IO ()
 main = do
     let dataX = "x" :: String
     let dataY = "y" :: String
     do ------------------------------------------------------------------------
         do
-            putStrLn "---------------- Test 01 - a"
             s0 <- atomically do newTStore dataX
-            s1 <- atomically do lookupTStore (tstoreIndex s0)
+            s1 <- atomically do unsafeLookupTStore (tStoreIndex s0)
             when (Just s0 /= s1) (error "reference not equal")
             r0 <- atomically $ readTStore s0
             when (r0 /= dataX) (error "data not equal")
         do 
-            putStrLn "---------------- Test 01 - b"
             (s0,s1) <- atomically do
                 s0 <- newTStore dataX
-                s1 <- lookupTStore (tstoreIndex s0)
+                s1 <- unsafeLookupTStore (tStoreIndex s0)
                 pure (s0,s1)
             when (Just s0 /= s1) (error "not equal")
             r0 <- atomically $ readTStore s0
             when (r0 /= dataX) (error "data not equal")
     do ------------------------------------------------------------------------
         do
-            putStrLn "---------------- Test 02 - a"
             s0 <- atomically do newTStore dataX
             s1 <- atomically do newTStore dataY
             when (s0 == s1) (error $ "not different: "<>show s0)
@@ -36,7 +33,6 @@ main = do
             when (r0 /= dataX) (error "data not equal (0)")
             when (r1 /= dataY) (error "data not equal (1)")
         do 
-            putStrLn "---------------- Test 02 - b"
             (s0,s1) <- atomically do
                 s0 <- newTStore dataX
                 s1 <- newTStore dataY
@@ -47,7 +43,6 @@ main = do
             when (r0 /= dataX) (error "data not equal (0)")
             when (r1 /= dataY) (error "data not equal (1)")
     
-    {-
     store0 <- atomically (newTStore ("first string" :: String))
     store0 <- atomically (newTStore ("first string" :: String))
 
@@ -58,7 +53,7 @@ main = do
     forkIO $ forever do
         atomically (writeTStore store0 "lots lots lots") {- will be called a lot -}
 
-    Just store1 <- atomically (lookupTStore (tstoreIndex store0))
+    Just store1 <- atomically (unsafeLookupTStore (tStoreIndex store0))
 
     unless (store0 == store1) (error $ "store0 == store1: "<>show store0<>" /= "<>show store1)
 
@@ -88,6 +83,5 @@ main = do
     store2 <- atomically (newTStore "im new")
 
     unless (store0 /= store2) (error $ "store0 /= store2: "<>show store0<>" == "<>show store2)
-    -}
-    putStrLn "waiting..."
-    threadDelay 2040800
+
+    threadDelay 5000000

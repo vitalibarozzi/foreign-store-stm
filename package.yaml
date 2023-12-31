@@ -6,7 +6,6 @@ dependencies:
 - foreign-store
 - concurrent-extra
 - stm
-- deepseq
 
 default-extensions:
 - OverloadedStrings

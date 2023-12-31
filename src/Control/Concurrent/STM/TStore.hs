@@ -1,8 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DatatypeContexts #-}
-{-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE ViewPatterns #-}
-
 -- | Wrapper around `Foreign.Store` to make it thread-safe (hopefully).
 module Control.Concurrent.STM.TStore
     ( -- * Transactional Store
@@ -14,127 +9,110 @@ module Control.Concurrent.STM.TStore
     -- * Writting
     , writeTStore
     -- * Utils
-    , lookupTStore
-    , tstoreIndex
+    , unsafeLookupTStore
+    , tStoreIndex
     -- * Reexports
     , module STM
+    , Word32
     )
 where
 
 
-import Control.Monad
-import qualified Control.Concurrent.STM as STM
 import Control.Concurrent
-import Data.Word (Word32)
-import qualified Foreign.Store as Store
 import Control.Exception (bracket,catch,SomeException(..))
-import GHC.Conc (STM,unsafeIOToSTM,retry)
-import qualified Control.Concurrent.STM.TVar as TVar
+import Control.Monad
 import Data.Typeable
-import Control.DeepSeq
+import Data.Word (Word32)
+import GHC.Conc (STM,retry)
+import qualified GHC.Conc as Unsafe (unsafeIOToSTM) 
+import qualified Control.Concurrent.STM as STM
+import qualified Control.Concurrent.STM.TVar as TVar
+import qualified Foreign.Store as Store
 
 
--- | Read-only transactional store based on `Foreign.Store`.
--- It is read-only so as to keep the mutable state inside the Store.
-newtype TStore a = TStore (NFData a => Store.Store (TVar.TVar a))
+-- | Parallel-safe store atop `Foreign.Store`.
+newtype TStore a 
+    = TStore { _runTStore :: Store.Store (TVar.TVar a) }
 
 
-instance NFData a => Eq (TStore a) where
-    {-# INLINE (==) #-}
-    (==) (TStore (Store.Store n0)) !(TStore (Store.Store n1)) = 
-        n0 == n1
+instance Eq (TStore a) where
+    (==) ts0 ts1 =
+        (==) 
+            (_runStore $ _runTStore ts0) 
+            (_runStore $ _runTStore ts1)
 
 
-instance NFData a => Show (TStore a) where
-    {-# INLINE show #-}
+instance Show (TStore a) where
     show (TStore store) = 
         "TStore ("<>show store<>")"
 
 
-newTStore :: NFData a => a -> STM (TStore a)
-{-# INLINE newTStore #-}
-newTStore !a = do
-    unsafeIOToSTM (putStrLn "newTStore")
-    tvar <- TVar.newTVar (deepseq a a)
-    TStore store <- next
-    _____ <- _writeStore store tvar
-    pure (TStore store)
+newTStore :: a -> STM (TStore a)
+newTStore a = do
+    tv <- TVar.newTVar a
+    ts <- _next
+    __ <- _writeStore (_runTStore ts) tv
+    pure ts
 
 
-readTStore :: NFData a => TStore a -> STM a
-{-# INLINE readTStore #-}
-readTStore (TStore store) = do
-    unsafeIOToSTM (putStrLn "readTStore")
-    tvar <- _readStore store
-    a <- TVar.readTVar tvar
-    deepseq a (pure a)
+readTStore :: TStore a -> STM a
+readTStore ts = do
+    tvar <- _readStore (_runTStore ts)
+    TVar.readTVar tvar
 
 
-writeTStore :: NFData a => TStore a -> a -> STM ()
-{-# INLINE writeTStore #-}
-writeTStore (TStore store) !a = do 
-    unsafeIOToSTM (putStrLn "writeTStore")
-    tvar <- _readStore store
-    TVar.writeTVar tvar (deepseq a a)
+writeTStore :: TStore a -> a -> STM ()
+writeTStore ts a = do 
+    tvar <- _readStore (_runTStore ts)
+    TVar.writeTVar tvar a
 
 
--- | Returns `Nothing` if it can't find a store for the given index
--- or if there are a type mismatches.
-lookupTStore :: Word32 -> STM (Maybe (TStore a))
-{-# INLINE lookupTStore #-}
-lookupTStore !n = do
+tStoreIndex :: TStore a -> Word32
+tStoreIndex = 
+    _runStore . _runTStore 
+
+
+-- | Returns `Nothing` if it can't find a store for the given index. 
+-- This function is unsafe in regards to the type of the `TStore`, 
+-- since the store may be found, but it may be for another type.
+unsafeLookupTStore :: Word32 -> STM (Maybe (TStore a))
+unsafeLookupTStore n = do
     _lookupStore n >>= \case
-        Nothing    -> unsafeIOToSTM (putStrLn $ "lookupTStore Nothing "<>show n) >> pure Nothing
-        Just store -> unsafeIOToSTM (putStrLn $ "lookupTStore Just "<>show n<>" "<> show store) >> pure (Just (TStore store))
+        Nothing    -> pure Nothing
+        Just store -> pure (Just (TStore store))
 
-
-next :: STM (TStore a)
-{-# INLINE next #-}
-next = do
-    unsafeIOToSTM (putStrLn "next")
-    counter <- _nextCounter
-    pure (TStore (_mkStore counter))
-    
-
-tstoreIndex (TStore (Store.Store n)) = 
-    n
 
 -------------------------------------------------------------------------------
 -- INTERNALS ------------------------------------------------------------------
 -------------------------------------------------------------------------------
-
-
 -- | Index offset for the `Foreign.Store`.
 _offset :: Word32
-{-# INLINE _offset #-}
-_offset = maxBound - 67295
-            
-
-_nextCounter :: STM Word32
+_offset = 
+    let magicNumber = 67295 
+    in (maxBound - magicNumber)
 _nextCounter = do
-    unsafeIOToSTM (putStrLn "_nextCounter")
-    _tryReadCounter >>= \case
+    c <- Unsafe.unsafeIOToSTM do 
+              catch 
+                  (fmap Just (Store.readStore (_mkStore _offset)))
+                  (\(_::SomeException) -> do
+                      tvar <- TVar.newTVarIO (_offset + 10)
+                      Store.writeStore (_mkStore _offset) tvar
+                      Just <$> Store.readStore (_mkStore _offset))
+    case c of
         Nothing -> retry
         Just var -> do
             n <- TVar.readTVar var 
-            unsafeIOToSTM (print n) 
             TVar.writeTVar var (1 + n)
             pure n
-
-_tryReadCounter = do
-          counter <- unsafeIOToSTM do 
-              putStrLn "_tryReadCounter"
-              catch 
-                  (fmap Just (Store.readStore (_mkStore _offset)))
-                  (\(e::SomeException) -> do
-                      putStrLn ("exception: "<>show e)
-                      tvar <- TVar.newTVarIO (_offset + 10)
-                      Store.writeStore (_mkStore _offset) tvar
-                      Just <$> Store.readStore (_mkStore _offset)
-                      )
-          pure counter
-
-_writeStore !s !a = unsafeIOToSTM (threadDelay 1 >> Store.writeStore s a)
-_readStore !s = unsafeIOToSTM (threadDelay 1 >> Store.readStore s)
-_lookupStore !n = unsafeIOToSTM (threadDelay 1 >> Store.lookupStore n)
+_writeStore s a = Unsafe.unsafeIOToSTM (Store.writeStore s a)
+_readStore s = Unsafe.unsafeIOToSTM (Store.readStore s)
+_lookupStore n = Unsafe.unsafeIOToSTM (Store.lookupStore n)
 _mkStore = Store.Store
+_devel k =
+    let isDevelopment = False
+    in if isDevelopment then k else pure ()
+_runStore (Store.Store n) = n
+_next :: STM (TStore a)
+_next = do
+    counter <- _nextCounter
+    pure (TStore (_mkStore counter))
