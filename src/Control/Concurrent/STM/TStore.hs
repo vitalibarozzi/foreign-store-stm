@@ -17,9 +17,7 @@ where
 
 
 import Control.Concurrent
-import Control.Exception (bracket,catch,SomeException(..))
-import Control.Monad
-import Data.Typeable
+import Control.Exception (catch,SomeException(..))
 import Data.Word (Word32)
 import GHC.Conc (STM,retry)
 import qualified GHC.Conc as Unsafe (unsafeIOToSTM) 
@@ -27,7 +25,6 @@ import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TVar as TVar
 import qualified Foreign.Store as Store
 
--- TODO how can we go from here to supporting the nested calls?
 
 -- | Parallel-safe store atop `Foreign.Store`.
 newtype TStore a = TStore 
@@ -104,7 +101,7 @@ _counterStore =
 
 _substore :: TStore a -> Store.Store a
 _substore = 
-    _mkStore . tStoreIndex
+    Store.Store . tStoreIndex
 
 
 -- | Index offset for the `Foreign.Store`.
@@ -126,10 +123,12 @@ _next = do
             TVar.writeTVar var (1 + n)
             pure n
         getCounterTVar = do 
-            let readStoreIO = 
+            let readStoreIO = do
+                    threadDelay 1
                     fmap Just (Store.readStore (_substore _counterStore))
             let handleErr SomeException{} = do
-                    tvar <- TVar.newTVarIO (1 + _offset)
+                    threadDelay 1
+                    tvar <- TVar.newTVarIO (10 + _offset)
                     ____ <- Store.writeStore (_substore _counterStore) tvar
                     fmap Just (Store.readStore (_substore _counterStore))
             Unsafe.unsafeIOToSTM (catch readStoreIO handleErr)
@@ -138,12 +137,14 @@ _next = do
 _writeStore :: Store.Store a -> a -> STM ()
 _writeStore s a = 
     Unsafe.unsafeIOToSTM do
+        threadDelay 1
         Store.writeStore s a
 
 
 _readStore :: Store.Store a -> STM (Maybe a)
 _readStore s = 
     Unsafe.unsafeIOToSTM do
+        threadDelay 1
         catch 
             (Just <$> Store.readStore s) 
             (\(e::SomeException) -> putStrLn (show e) >> pure Nothing)
@@ -152,14 +153,10 @@ _readStore s =
 _lookupStore :: Word32 -> STM (Maybe (Store.Store a)) 
 _lookupStore n = 
     Unsafe.unsafeIOToSTM do
+        threadDelay 1
         catch 
             (Store.lookupStore n) 
             (\(_::SomeException) -> pure Nothing)
-
-
-_mkStore :: Word32 -> Store.Store a
-_mkStore = 
-    Store.Store
 
 
 _runStore :: Store.Store a -> Word32

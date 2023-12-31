@@ -1,10 +1,9 @@
 name:                foreign-store-stm
-version:             0.1.0.0
+version:             0.1.0.1
 
 dependencies:
 - base >= 4.7 && < 5
 - foreign-store
-- concurrent-extra
 - stm
 
 default-extensions:
