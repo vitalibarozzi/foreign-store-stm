@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DatatypeContexts #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -14,7 +15,7 @@ module Control.Concurrent.STM.TStore
     , writeTStore
     -- * Utils
     , lookupTStore
-    , lookupTStore_
+    , tstoreIndex
     -- * Reexports
     , module STM
     )
@@ -28,107 +29,79 @@ import Data.Word (Word32)
 import qualified Foreign.Store as Store
 import Control.Exception (bracket,catch,SomeException(..))
 import GHC.Conc (STM,unsafeIOToSTM,retry)
-import qualified Control.Concurrent.ReadWriteLock as Lock
 import qualified Control.Concurrent.STM.TVar as TVar
 import Data.Typeable
+import Control.DeepSeq
 
 
 -- | Read-only transactional store based on `Foreign.Store`.
--- It is read-only so as to keep the mutable state inside the Store, 
--- under a lock.
-newtype TStore a 
-    = TStore 
-        (Store.Store 
-            ( Lock.RWLock
-            , TVar.TVar a -- We use an TVar here so we don't have to write to the store.
-            ))
+-- It is read-only so as to keep the mutable state inside the Store.
+newtype TStore a = TStore (NFData a => Store.Store (TVar.TVar a))
 
 
-instance Eq (TStore a) where
+instance NFData a => Eq (TStore a) where
     {-# INLINE (==) #-}
     (==) (TStore (Store.Store n0)) !(TStore (Store.Store n1)) = 
         n0 == n1
 
 
-instance Show (TStore a) where
+instance NFData a => Show (TStore a) where
     {-# INLINE show #-}
     show (TStore store) = 
         "TStore ("<>show store<>")"
 
 
-newTStore :: a -> STM (TStore a)
+newTStore :: NFData a => a -> STM (TStore a)
 {-# INLINE newTStore #-}
-newTStore a = do
+newTStore !a = do
+    unsafeIOToSTM (putStrLn "newTStore")
+    tvar <- TVar.newTVar (deepseq a a)
     TStore store <- next
-    tvar  <- TVar.newTVar a
-    lock  <- unsafeIOToSTM Lock.new
-    _____ <- _writeStore store (lock, tvar)
+    _____ <- _writeStore store tvar
     pure (TStore store)
 
 
-readTStore :: TStore a -> STM a
+readTStore :: NFData a => TStore a -> STM a
 {-# INLINE readTStore #-}
 readTStore (TStore store) = do
-    (lock, tvar) <- _readStore store
-    foo <- unsafeIOToSTM do
-        lockAcquired <- Lock.tryAcquireRead lock
-        if lockAcquired
-            then pure (Just (lock, tvar))
-            else pure Nothing
-    case foo of
-        Nothing -> retry
-        Just (lock,tvar) -> do
-            a <- TVar.readTVar tvar
-            unsafeIOToSTM (Lock.releaseRead lock) 
-            pure a
+    unsafeIOToSTM (putStrLn "readTStore")
+    tvar <- _readStore store
+    a <- TVar.readTVar tvar
+    deepseq a (pure a)
 
 
-writeTStore :: TStore a -> a -> STM ()
+writeTStore :: NFData a => TStore a -> a -> STM ()
 {-# INLINE writeTStore #-}
-writeTStore (TStore store) a = do 
-    (lock, tvar) <- _readStore store
-    lockAcquired <- unsafeIOToSTM (Lock.tryAcquireWrite lock)
-    unless lockAcquired retry
-    TVar.writeTVar tvar a 
-    unsafeIOToSTM (Lock.releaseWrite lock)
-
-
--- | Will retry until if finds a store.
-lookupTStore :: Word32 -> STM (TStore a)
-{-# INLINE lookupTStore #-}
-lookupTStore !n = do
-    maybe retry pure =<< lookupTStore_ n
+writeTStore (TStore store) !a = do 
+    unsafeIOToSTM (putStrLn "writeTStore")
+    tvar <- _readStore store
+    TVar.writeTVar tvar (deepseq a a)
 
 
 -- | Returns `Nothing` if it can't find a store for the given index
 -- or if there are a type mismatches.
-lookupTStore_ :: Word32 -> STM (Maybe (TStore a))
-{-# INLINE lookupTStore_ #-}
-lookupTStore_ !n = do
+lookupTStore :: Word32 -> STM (Maybe (TStore a))
+{-# INLINE lookupTStore #-}
+lookupTStore !n = do
     _lookupStore n >>= \case
-        Nothing    -> pure Nothing
-        Just store -> pure (Just (TStore store))
+        Nothing    -> unsafeIOToSTM (putStrLn $ "lookupTStore Nothing "<>show n) >> pure Nothing
+        Just store -> unsafeIOToSTM (putStrLn $ "lookupTStore Just "<>show n<>" "<> show store) >> pure (Just (TStore store))
 
 
 next :: STM (TStore a)
 {-# INLINE next #-}
 next = do
-    (lock, counterTVar) <- _readStore (_mkStore _offset)
-    lockAcquired <- unsafeIOToSTM (Lock.tryAcquireRead lock)
-    if not lockAcquired
-        then next
-        else do
-            counter <- TVar.readTVar counterTVar
-            let newCounter = (1 + counter)
-            TVar.writeTVar counterTVar newCounter
-            pure (TStore (_mkStore counter))
+    unsafeIOToSTM (putStrLn "next")
+    counter <- _nextCounter
+    pure (TStore (_mkStore counter))
     
 
+tstoreIndex (TStore (Store.Store n)) = 
+    n
 
 -------------------------------------------------------------------------------
 -- INTERNALS ------------------------------------------------------------------
 -------------------------------------------------------------------------------
-
 
 
 -- | Index offset for the `Foreign.Store`.
@@ -137,10 +110,31 @@ _offset :: Word32
 _offset = maxBound - 67295
             
 
-_readStore s = unsafeIOToSTM (Store.readStore s)
+_nextCounter :: STM Word32
+_nextCounter = do
+    unsafeIOToSTM (putStrLn "_nextCounter")
+    _tryReadCounter >>= \case
+        Nothing -> retry
+        Just var -> do
+            n <- TVar.readTVar var 
+            unsafeIOToSTM (print n) 
+            TVar.writeTVar var (1 + n)
+            pure n
 
-_writeStore s a = unsafeIOToSTM (Store.writeStore s a)
+_tryReadCounter = do
+          counter <- unsafeIOToSTM do 
+              putStrLn "_tryReadCounter"
+              catch 
+                  (fmap Just (Store.readStore (_mkStore _offset)))
+                  (\(e::SomeException) -> do
+                      putStrLn ("exception: "<>show e)
+                      tvar <- TVar.newTVarIO (_offset + 10)
+                      Store.writeStore (_mkStore _offset) tvar
+                      Just <$> Store.readStore (_mkStore _offset)
+                      )
+          pure counter
 
-_lookupStore n = unsafeIOToSTM (Store.lookupStore n)
-
+_writeStore !s !a = unsafeIOToSTM (threadDelay 1 >> Store.writeStore s a)
+_readStore !s = unsafeIOToSTM (threadDelay 1 >> Store.readStore s)
+_lookupStore !n = unsafeIOToSTM (threadDelay 1 >> Store.lookupStore n)
 _mkStore = Store.Store
