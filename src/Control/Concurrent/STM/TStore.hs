@@ -17,6 +17,7 @@ where
 
 
 import Control.Concurrent
+import Control.Monad
 import Control.Exception (catch,SomeException(..))
 import Data.Word (Word32)
 import GHC.Conc (STM,retry)
@@ -26,12 +27,13 @@ import qualified Control.Concurrent.STM.TVar as TVar
 import qualified Foreign.Store as Store
 
 
--- | Parallel-safe store atop `Foreign.Store`.
+-- | Thread-safe (hopefully) store atop `Foreign.Store`.
 newtype TStore a = TStore 
     { _runTStore :: Store.Store (TVar.TVar a) }
 
 
 instance Eq (TStore a) where
+    {-# INLINE (==) #-}
     (==) ts0 ts1 =
         (==) 
             (_runStore (_runTStore ts0))
@@ -39,29 +41,32 @@ instance Eq (TStore a) where
 
 
 instance Show (TStore a) where
+    {-# INLINE show #-}
     show (TStore store) = 
         "TStore ("<>show store<>")"
 
 
 newTStore :: a -> STM (TStore a)
+{-# INLINABLE newTStore #-}
 newTStore a = do
     tv <- TVar.newTVar a
-    ts <- _next
-    __ <- _writeStore (_runTStore ts) tv
-    pure ts
+    ts <- _nextCounter
+    __ <- _writeStore (_substore (tStore ts)) tv
+    pure (tStore ts)
 
 
 -- | If the Store does not exist it will retry until it does.
 readTStore :: TStore a -> STM a
+{-# INLINABLE readTStore #-}
 readTStore ts = do
     _readStore (_runTStore ts) 
-        -- >>= maybe retry TVar.readTVar
-        >>= maybe undefined TVar.readTVar
+        >>= maybe retry TVar.readTVar
 
 
 -- | Creates the TStore before writing to it if the TStore does not exists
 -- already.
 writeTStore :: TStore a -> a -> STM ()
+{-# INLINABLE writeTStore #-}
 writeTStore ts a = do 
     _readStore (_runTStore ts) 
         >>= maybe 
@@ -73,20 +78,23 @@ writeTStore ts a = do
 -- This function is unsafe in regards to the type of the `TStore`, 
 -- since the store may be found, but it may be for another type.
 unsafeLookupTStore :: Word32 -> STM (Maybe (TStore a))
-unsafeLookupTStore =
-    fmap (fmap TStore) . _lookupStore
+{-# INLINE unsafeLookupTStore #-}
+unsafeLookupTStore w32 = do
+    fmap (fmap TStore) . _lookupStore $ w32
 
 
 -- | Gather the index of the TStore.
 tStoreIndex :: TStore a -> Word32
+{-# INLINE tStoreIndex #-}
 tStoreIndex = 
     _runStore . _runTStore 
 
 
--- | Constructs a TStore reference, not the real Store in memory.
-tStore :: Word32 -> TStore a
+-- | Constructs a TStore reference, but do not construct the TStore in memory.
+tStore :: Counter -> TStore a
+{-# INLINE tStore #-}
 tStore = 
-    TStore . Store.Store
+    TStore . Store.Store . _runCounter
 
 
 -------------------------------------------------------------------------------
@@ -94,55 +102,50 @@ tStore =
 -------------------------------------------------------------------------------
 
 
-_counterStore :: TStore a
+_counterStore :: TStore Counter
+{-# INLINE _counterStore #-}
 _counterStore = 
-    tStore _offset
-
-
-_substore :: TStore a -> Store.Store a
-_substore = 
-    Store.Store . tStoreIndex
+    tStore (UnsafeCounter _offset)
 
 
 -- | Index offset for the `Foreign.Store`.
 _offset :: Word32
+{-# INLINE _offset #-}
 _offset = 
-    let magicNumber = 67295 
+    let magicNumber = 67295  -- TODO why can't I change this number?
     in (maxBound - magicNumber)
 
 
-_next :: STM (TStore a)
-_next = do
-    fmap tStore nextCounter
-  where
-    nextCounter = do
-        maybe retry swapCounter =<< getCounterTVar 
-      where
-        swapCounter var = do
-            n <- TVar.readTVar var 
-            TVar.writeTVar var (1 + n)
-            pure n
-        getCounterTVar = do 
-            let readStoreIO = do
-                    threadDelay 1
-                    fmap Just (Store.readStore (_substore _counterStore))
-            let handleErr SomeException{} = do
-                    threadDelay 1
-                    tvar <- TVar.newTVarIO (10 + _offset)
-                    ____ <- Store.writeStore (_substore _counterStore) tvar
-                    fmap Just (Store.readStore (_substore _counterStore))
-            Unsafe.unsafeIOToSTM (catch readStoreIO handleErr)
+-- | Used to extract the index from the store.
+_runStore :: Store.Store a -> Word32
+{-# INLINE _runStore #-}
+_runStore (Store.Store n) = 
+    n
+
+
+-- | Used to extract/run the store.
+_substore :: TStore a -> Store.Store (TVar.TVar a)
+{-# INLINE _substore #-}
+_substore = 
+    Store.Store . tStoreIndex
+
+
+-------------------------------------------------------------------------------
+-- IO HELPERS -----------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 
 _writeStore :: Store.Store a -> a -> STM ()
-_writeStore s a = 
+{-# INLINABLE _writeStore #-}
+_writeStore s a = do
     Unsafe.unsafeIOToSTM do
         threadDelay 1
         Store.writeStore s a
 
 
 _readStore :: Store.Store a -> STM (Maybe a)
-_readStore s = 
+{-# INLINABLE _readStore #-}
+_readStore s = do
     Unsafe.unsafeIOToSTM do
         threadDelay 1
         catch 
@@ -151,14 +154,61 @@ _readStore s =
 
 
 _lookupStore :: Word32 -> STM (Maybe (Store.Store a)) 
-_lookupStore n = 
+{-# INLINABLE _lookupStore #-}
+_lookupStore n = do 
     Unsafe.unsafeIOToSTM do
         threadDelay 1
         catch 
             (Store.lookupStore n) 
-            (\(_::SomeException) -> pure Nothing)
+            (\(e::SomeException) -> putStrLn (show e) >> pure Nothing)
 
 
-_runStore :: Store.Store a -> Word32
-_runStore (Store.Store n) = 
-    n
+-------------------------------------------------------------------------------
+-- COUNTER --------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
+
+-- | A counter used to know the next position/index of the store.
+newtype Counter = UnsafeCounter 
+    { _runCounter :: Word32 }
+
+
+_initialCounter :: Counter
+{-# INLINE _initialCounter #-}
+_initialCounter = 
+    UnsafeCounter (10 + _offset)
+
+
+_incrementCounter :: Counter -> Counter
+{-# INLINE _incrementCounter #-}
+_incrementCounter (UnsafeCounter w32) = 
+    if 1 + w32 <= _offset
+        then error "Index collision."
+        else UnsafeCounter (1 + w32)
+
+
+_nextCounter :: STM Counter
+{-# INLINABLE _nextCounter #-}
+_nextCounter = do
+    co <- _getCounter
+    __ <- _incCounter co
+    pure co
+  where
+    _getCounter :: STM Counter
+    _getCounter = do 
+        mw <- Unsafe.unsafeIOToSTM do
+            threadDelay 1
+            catch 
+                (Store.readStore (_substore _counterStore) >>= pure . Left)
+                (\e -> do
+                    __ <- print (e :: SomeException)
+                    tv <- TVar.newTVarIO _initialCounter
+                    __ <- Store.writeStore (_substore _counterStore) tv
+                    pure (Right _initialCounter))
+        case mw of
+            Left tvr -> TVar.readTVar tvr
+            Right co -> pure co
+    _incCounter :: Counter -> STM ()
+    _incCounter co = do 
+        tv <- Unsafe.unsafeIOToSTM do Store.readStore (_substore _counterStore)
+        TVar.writeTVar tv (_incrementCounter co)
