@@ -150,7 +150,7 @@ _readStore s = do
         threadDelay 1
         catch 
             (Just <$> Store.readStore s) 
-            (\(e::SomeException) -> putStrLn (show e) >> pure Nothing)
+            (\(e::SomeException) -> putStrLn ("_readStore: "<> show e) >> pure Nothing)
 
 
 _lookupStore :: Word32 -> STM (Maybe (Store.Store a)) 
@@ -160,7 +160,7 @@ _lookupStore n = do
         threadDelay 1
         catch 
             (Store.lookupStore n) 
-            (\(e::SomeException) -> putStrLn (show e) >> pure Nothing)
+            (\(e::SomeException) -> putStrLn ("_lookupStore: "<> show e) >> pure Nothing)
 
 
 -------------------------------------------------------------------------------
@@ -201,7 +201,7 @@ _nextCounter = do
             catch 
                 (Store.readStore (_substore _counterStore) >>= pure . Left)
                 (\e -> do
-                    __ <- print (e :: SomeException)
+                    __ <- putStrLn ("_nextCounter: "<> show (e :: SomeException))
                     tv <- TVar.newTVarIO _initialCounter
                     __ <- Store.writeStore (_substore _counterStore) tv
                     pure (Right _initialCounter))

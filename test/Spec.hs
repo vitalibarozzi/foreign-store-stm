@@ -58,7 +58,6 @@ main = do
     unless (store0 == store1) (error $ "store0 == store1: "<>show store0<>" /= "<>show store1)
 
     threadDelay 1000000
-    print "using a store gathered with lookup"
 
     forkIO $ forever do
         threadDelay 523
@@ -84,4 +83,4 @@ main = do
 
     unless (store0 /= store2) (error $ "store0 /= store2: "<>show store0<>" == "<>show store2)
 
-    threadDelay 5000000
+    threadDelay 2000000
