@@ -8,6 +8,7 @@ module Control.Concurrent.STM.TStore
     -- * Utils
     , unsafeLookupTStore
     , tStoreIndex
+    , tStoreCounter
     , tStore
     -- * Reexports
     , module STM
@@ -16,9 +17,10 @@ module Control.Concurrent.STM.TStore
 where
 
 
+import Prelude
 import Control.Concurrent
 import Control.Monad
-import Control.Exception (catch,SomeException(..))
+import Control.Exception (catch,SomeException(..),fromException)
 import Data.Word (Word32)
 import GHC.Conc (STM,retry)
 import qualified GHC.Conc as Unsafe (unsafeIOToSTM) 
@@ -51,8 +53,8 @@ newTStore :: a -> STM (TStore a)
 newTStore a = do
     tv <- TVar.newTVar a
     ts <- _nextCounter
-    __ <- _writeStore (_substore (tStore ts)) tv
-    pure (tStore ts)
+    __ <- _writeStore (_substore (tStoreCounter ts)) tv
+    pure (tStoreCounter ts)
 
 
 -- | If the Store does not exist it will retry until it does.
@@ -90,11 +92,17 @@ tStoreIndex =
     _runStore . _runTStore 
 
 
+tStoreCounter :: Counter -> TStore a
+{-# INLINE tStoreCounter #-}
+tStoreCounter = 
+    tStore . _runCounter
+
+
 -- | Constructs a TStore reference, but do not construct the TStore in memory.
-tStore :: Counter -> TStore a
+tStore :: Word32 -> TStore a
 {-# INLINE tStore #-}
 tStore = 
-    TStore . Store.Store . _runCounter
+    TStore . Store.Store
 
 
 -------------------------------------------------------------------------------
@@ -105,7 +113,7 @@ tStore =
 _counterStore :: TStore Counter
 {-# INLINE _counterStore #-}
 _counterStore = 
-    tStore (UnsafeCounter _offset)
+    tStoreCounter (UnsafeCounter _offset)
 
 
 -- | Index offset for the `Foreign.Store`.
@@ -139,7 +147,6 @@ _writeStore :: Store.Store a -> a -> STM ()
 {-# INLINABLE _writeStore #-}
 _writeStore s a = do
     Unsafe.unsafeIOToSTM do
-        threadDelay 1
         Store.writeStore s a
 
 
@@ -147,17 +154,19 @@ _readStore :: Store.Store a -> STM (Maybe a)
 {-# INLINABLE _readStore #-}
 _readStore s = do
     Unsafe.unsafeIOToSTM do
-        threadDelay 1
         catch 
             (Just <$> Store.readStore s) 
-            (\(e::SomeException) -> putStrLn ("_readStore: "<> show e) >> pure Nothing)
+            (\(e::SomeException) -> 
+                case fromException e of
+                    Nothing -> putStrLn ("_readStore: "<> show e) >> pure Nothing
+                    Just Store.StoreNotFound -> pure Nothing
+            )
 
 
 _lookupStore :: Word32 -> STM (Maybe (Store.Store a)) 
 {-# INLINABLE _lookupStore #-}
 _lookupStore n = do 
     Unsafe.unsafeIOToSTM do
-        threadDelay 1
         catch 
             (Store.lookupStore n) 
             (\(e::SomeException) -> putStrLn ("_lookupStore: "<> show e) >> pure Nothing)
@@ -176,13 +185,13 @@ newtype Counter = UnsafeCounter
 _initialCounter :: Counter
 {-# INLINE _initialCounter #-}
 _initialCounter = 
-    UnsafeCounter (10 + _offset)
+    UnsafeCounter (1 + _offset)
 
 
 _incrementCounter :: Counter -> Counter
 {-# INLINE _incrementCounter #-}
 _incrementCounter (UnsafeCounter w32) = 
-    if 1 + w32 <= _offset
+    if 1 + w32 == _offset
         then error "Index collision."
         else UnsafeCounter (1 + w32)
 
@@ -190,14 +199,13 @@ _incrementCounter (UnsafeCounter w32) =
 _nextCounter :: STM Counter
 {-# INLINABLE _nextCounter #-}
 _nextCounter = do
-    co <- _getCounter
-    __ <- _incCounter co
+    co <- getCounter
+    __ <- incCounter co
     pure co
   where
-    _getCounter :: STM Counter
-    _getCounter = do 
+    getCounter :: STM Counter
+    getCounter = do 
         mw <- Unsafe.unsafeIOToSTM do
-            threadDelay 1
             catch 
                 (Store.readStore (_substore _counterStore) >>= pure . Left)
                 (\e -> do
@@ -208,7 +216,7 @@ _nextCounter = do
         case mw of
             Left tvr -> TVar.readTVar tvr
             Right co -> pure co
-    _incCounter :: Counter -> STM ()
-    _incCounter co = do 
+    incCounter :: Counter -> STM ()
+    incCounter co = do 
         tv <- Unsafe.unsafeIOToSTM do Store.readStore (_substore _counterStore)
         TVar.writeTVar tv (_incrementCounter co)
